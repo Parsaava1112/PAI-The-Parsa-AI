@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:lottie/lottie.dart';
-import '../widgets/typewriter_text.dart';
 
 class ChatBubble extends StatefulWidget {
   final String message;
@@ -30,10 +29,13 @@ class ChatBubble extends StatefulWidget {
 class _ChatBubbleState extends State<ChatBubble> with SingleTickerProviderStateMixin {
   final FlutterTts _flutterTts = FlutterTts();
   bool _isSpeaking = false;
+  bool _ttsAvailable = false;
+  bool _ttsChecked = false;
 
   @override
   void initState() {
     super.initState();
+    _checkTts();
     _flutterTts.setCompletionHandler(() {
       if (mounted) setState(() => _isSpeaking = false);
     });
@@ -42,16 +44,40 @@ class _ChatBubbleState extends State<ChatBubble> with SingleTickerProviderStateM
     });
   }
 
+  Future<void> _checkTts() async {
+    try {
+      final available = await _flutterTts.isLanguageAvailable("fa-IR");
+      if (mounted) {
+        setState(() {
+          _ttsAvailable = available;
+          _ttsChecked = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _ttsAvailable = false;
+          _ttsChecked = true;
+        });
+      }
+    }
+  }
+
   Future<void> _speak() async {
+    if (!_ttsAvailable) return;
     if (_isSpeaking) {
       await _flutterTts.stop();
       setState(() => _isSpeaking = false);
       return;
     }
     setState(() => _isSpeaking = true);
-    await _flutterTts.setLanguage("fa-IR");
-    await _flutterTts.setSpeechRate(0.5);
-    await _flutterTts.speak(widget.message);
+    try {
+      await _flutterTts.setLanguage("fa-IR");
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.speak(widget.message);
+    } catch (e) {
+      if (mounted) setState(() => _isSpeaking = false);
+    }
   }
 
   void _copyToClipboard() {
@@ -63,6 +89,8 @@ class _ChatBubbleState extends State<ChatBubble> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final isButtonActive = _ttsChecked && _ttsAvailable;
+
     return Align(
       alignment: widget.isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -99,15 +127,18 @@ class _ChatBubbleState extends State<ChatBubble> with SingleTickerProviderStateM
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            widget.isUser
-                ? Text(widget.message, style: const TextStyle(color: Colors.white))
-                : TypewriterText(text: widget.message),
+            // نمایش متن ساده (بدون افکت تایپ)
+            Text(
+              widget.message,
+              style: TextStyle(
+                color: widget.isUser ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
             const SizedBox(height: 8),
             // ردیف دکمه‌های کمکی
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // دکمه کپی
                 IconButton(
                   iconSize: 18,
                   icon: const FaIcon(FontAwesomeIcons.copy, size: 16),
@@ -115,20 +146,25 @@ class _ChatBubbleState extends State<ChatBubble> with SingleTickerProviderStateM
                   splashRadius: 18,
                 ),
                 const SizedBox(width: 4),
-                // دکمه خواندن (تبدیل به موج صدا هنگام صحبت)
-                IconButton(
-                  iconSize: 18,
-                  icon: _isSpeaking
-                      ? Lottie.asset(
-                          'assets/lottie/weather/sound_wave.json',
-                          width: 24,
-                          height: 24,
-                        )
-                      : const FaIcon(FontAwesomeIcons.volumeHigh, size: 16),
-                  onPressed: _speak,
-                  splashRadius: 18,
+                IgnorePointer(
+                  ignoring: !isButtonActive,
+                  child: IconButton(
+                    iconSize: 18,
+                    icon: _isSpeaking
+                        ? Lottie.asset(
+                            'assets/lottie/weather/sound_wave.json',
+                            width: 24,
+                            height: 24,
+                          )
+                        : FaIcon(
+                            FontAwesomeIcons.volumeHigh,
+                            size: 16,
+                            color: isButtonActive ? null : Colors.grey,
+                          ),
+                    onPressed: isButtonActive ? _speak : null,
+                    splashRadius: 18,
+                  ),
                 ),
-                // دکمه‌های فیدبک (فقط برای پیام هوش مصنوعی)
                 if (widget.showFeedback && widget.messageId != null) ...[
                   const SizedBox(width: 4),
                   IconButton(
@@ -142,7 +178,7 @@ class _ChatBubbleState extends State<ChatBubble> with SingleTickerProviderStateM
                     ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      // اینجا کد ارسال فیدبک
+                      // ارسال فیدبک (در صورت نیاز)
                     },
                     splashRadius: 18,
                   ),
@@ -157,7 +193,7 @@ class _ChatBubbleState extends State<ChatBubble> with SingleTickerProviderStateM
                     ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      // اینجا کد ارسال فیدبک
+                      // ارسال فیدبک (در صورت نیاز)
                     },
                     splashRadius: 18,
                   ),
