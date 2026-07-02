@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:ui'; // <-- برای ImageFilter.blur
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:lottie/lottie.dart';
-import 'package:sensors_plus/sensors_plus.dart';
+import 'package:sensors_plus/sensors_plus.dart'; // <-- این شامل gyroEvents می‌شود
 import 'package:shimmer/shimmer.dart';
 import '../routes/custom_page_route.dart';
 import 'login_screen.dart';
@@ -70,7 +71,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     // --- ۶. ژیروسکوپ (واکنش به حرکت دستگاه) ---
-    _gyroSubscription = gyroEvents.listen((event) {
+    // در نسخه‌های جدید sensors_plus از gyroEvents استفاده می‌کنیم
+    _gyroSubscription = gyroEvents.listen((GyroscopeEvent event) {
       setState(() {
         // محدود کردن دامنه حرکت و نرم‌سازی
         _gyroX = event.x.clamp(-0.5, 0.5);
@@ -260,7 +262,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final button = ClipRRect(
       borderRadius: BorderRadius.circular(30),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8), // حالا ImageFilter قابل شناسایی است
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
