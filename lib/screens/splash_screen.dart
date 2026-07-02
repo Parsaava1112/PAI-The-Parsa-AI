@@ -141,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       child: Lottie.asset('assets/lottie/robot_3d.json'),
                     ).animate().scale(duration: 1.seconds).fadeIn(),
                     const SizedBox(height: 20),
-                    Text('KAI AI',
+                    Text('Parsa AI',
                             style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'Vazir'))
                         .animate().fadeIn(delay: 0.5.seconds),
                   ],
