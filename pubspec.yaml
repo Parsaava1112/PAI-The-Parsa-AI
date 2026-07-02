@@ -23,12 +23,17 @@ dependencies:
   sqflite_common_ffi: ^2.3.0
   flutter_tts: ^3.8.0
   geolocator: ^10.1.0
-  sensors_plus: ^4.0.2   # یا آخرین نسخه
+  sensors_plus: ^4.0.2   # یا آخرین نسخه (ممکنه تو بخش‌های دیگه استفاده بشه)
   shimmer: ^3.0.0
 
   # بسته‌های اضافه‌شده برای ویژگی‌های جدید
   flutter_markdown: ^0.7.2+1       # نمایش پیام‌های AI با مارک‌داون و کد
   share_plus: ^7.2.1               # اشتراک‌گذاری (دکمه Share در منوی پیام)
+
+  # ===== بسته‌های مورد نیاز صفحه تنظیمات جدید =====
+  ambient_light: ^1.0.2            # دریافت نور محیط برای تم هوشمند
+  palette_generator: ^0.3.3+1     # استخراج پالت رنگ از عکس (تم جادویی)
+  image_picker: ^1.0.7            # انتخاب عکس از گالری
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
