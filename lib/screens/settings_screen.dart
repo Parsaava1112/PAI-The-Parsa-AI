@@ -1,19 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io'; // <-- برای استفاده از File
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'package:ambient_light/ambient_light.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 
-// مدیریت ساده‌ی زبان (برای تغییر locale)
+// مدیریت ساده‌ی زبان
 class LocaleProvider extends ChangeNotifier {
   Locale _locale = const Locale('fa');
   Locale get locale => _locale;
@@ -42,10 +41,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final PageController _bgPageController = PageController(viewportFraction: 0.35);
   final ImagePicker _imagePicker = ImagePicker();
 
-  StreamSubscription<double>? _lightSubscription;
-  double _ambientLux = 500;
-  bool _isSmartThemeActive = false;
-
   late SharedPreferences _prefs;
   bool _incognitoMode = false;
   double _chatFontSize = 16.0;
@@ -63,7 +58,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _initPrefs();
     _fetchAIModels();
-    _listenToAmbientLight();
   }
 
   Future<void> _initPrefs() async {
@@ -94,24 +88,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _listenToAmbientLight() {
-    // در نسخه 0.1.4 از ambient_light، stream به این صورت در دسترس است
-    _lightSubscription = AmbientLight().lightLevelStream.listen((lux) {
-      if (mounted && _isSmartThemeActive) {
-        final themeProv = context.read<ThemeProvider>();
-        if (lux < 30 && themeProv.currentThemeName != 'dark') {
-          themeProv.changeTheme('dark');
-        } else if (lux >= 30 && themeProv.currentThemeName == 'dark') {
-          themeProv.changeTheme('light');
-        }
-      }
-      if (mounted) setState(() => _ambientLux = lux);
-    });
-  }
-
   @override
   void dispose() {
-    _lightSubscription?.cancel();
     _bgPageController.dispose();
     super.dispose();
   }
@@ -145,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
     final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(
-      FileImage(File(image.path)), // File از dart:io
+      FileImage(File(image.path)),
       size: const Size(200, 200),
       maximumColorCount: 5,
     );
@@ -252,26 +230,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         RadioListTile<String>(
                           title: const Text('خودکار (بر اساس ساعت)'),
                           value: 'auto',
-                          groupValue: _isSmartThemeActive ? '' : themeProv.currentThemeName,
+                          groupValue: themeProv.currentThemeName,
                           onChanged: (v) {
                             themeProv.changeTheme(v!);
-                            setState(() => _isSmartThemeActive = false);
-                          },
-                          activeColor: _accentColor,
-                        ),
-                        SwitchListTile(
-                          title: const Text('هوشمند (بر اساس نور محیط)'),
-                          subtitle: Text('لوکس فعلی: ${_ambientLux.toStringAsFixed(0)}'),
-                          value: _isSmartThemeActive,
-                          onChanged: (val) {
-                            setState(() => _isSmartThemeActive = val);
-                            if (val) {
-                              if (_ambientLux < 30) {
-                                themeProv.changeTheme('dark');
-                              } else {
-                                themeProv.changeTheme('light');
-                              }
-                            }
                           },
                           activeColor: _accentColor,
                         ),
@@ -551,10 +512,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return RadioListTile<String>(
       title: Text(title),
       value: value,
-      groupValue: _isSmartThemeActive ? '' : themeProv.currentThemeName,
+      groupValue: themeProv.currentThemeName,
       onChanged: (v) {
         themeProv.changeTheme(v!);
-        setState(() => _isSmartThemeActive = false);
       },
       activeColor: _accentColor,
     );
@@ -651,7 +611,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// ویجت پیش‌نمایش چت
+// پیش‌نمایش چت
 class _ChatPreview extends StatelessWidget {
   final Color accentColor;
   final double fontSize;
@@ -755,7 +715,6 @@ class _BgCarouselItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // برای جلوگیری از خطای nullable در AssetImage
     final String? bgPath = path;
     return GestureDetector(
       onTap: onTap,
