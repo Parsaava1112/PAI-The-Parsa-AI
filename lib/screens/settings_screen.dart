@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui'; // اضافه کردن برای اطمینان (هر چند با material در دسترس است)
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
@@ -79,12 +80,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() {
           _aiModels = models;
+          // اگر هیچ مدلی نبود، مقدار پیش‌فرض را null بگذار
           _selectedModelId = models.isNotEmpty ? models.first['id'] : null;
           _modelsLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _modelsLoading = false);
+      if (mounted) {
+        setState(() => _modelsLoading = false);
+        // در صورت تمایل می‌توانید خطا را نمایش دهید
+        debugPrint('Error fetching AI models: $e');
+      }
     }
   }
 
@@ -120,19 +126,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _createThemeFromImage() async {
-    final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
-    if (image == null) return;
-    final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(
-      FileImage(File(image.path)),
-      size: const Size(200, 200),
-      maximumColorCount: 5,
-    );
-    final dominantColor = palette.dominantColor?.color ?? Colors.blue;
-    _saveAccentColor(dominantColor);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('رنگ اصلی از عکس استخراج شد: ${dominantColor.toString()}')),
+    try {
+      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+      final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(
+        FileImage(File(image.path)),
+        size: const Size(200, 200),
+        maximumColorCount: 5,
       );
+      final dominantColor = palette.dominantColor?.color ?? Colors.blue;
+      _saveAccentColor(dominantColor);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('رنگ اصلی از عکس استخراج شد: ${dominantColor.toString()}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا در استخراج رنگ: $e')),
+        );
+      }
     }
   }
 
@@ -334,6 +348,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: 10),
                         if (_modelsLoading)
                           const Center(child: CircularProgressIndicator())
+                        else if (_aiModels.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            child: Text('مدلی یافت نشد', style: TextStyle(color: Colors.grey)),
+                          )
                         else
                           Row(
                             children: [
@@ -490,7 +509,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
-        filter: ColorFilter.mode(Colors.white.withOpacity(0.1), BlendMode.srcOver),
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // ✅ اصلاح: ImageFilter به‌جای ColorFilter
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -636,7 +655,9 @@ class _ChatPreview extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
-          colors: isDark ? [Colors.grey[850]!, Colors.grey[900]!] : [Colors.grey[100]!, Colors.white],
+          colors: isDark
+              ? [Colors.grey[850] ?? Colors.grey, Colors.grey[900] ?? Colors.grey] // ✅ رفع null assertion
+              : [Colors.grey[100]!, Colors.white],
         ),
       ),
       padding: const EdgeInsets.all(12),
