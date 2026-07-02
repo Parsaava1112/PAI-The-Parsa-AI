@@ -24,6 +24,8 @@ dependencies:
   sqflite_common_ffi: ^2.3.0
   flutter_tts: ^3.8.0
   geolocator: ^10.1.0
+  sensors_plus: ^4.0.2   # یا آخرین نسخه
+  shimmer: ^3.0.0
 
   # بسته‌های اضافه‌شده برای ویژگی‌های جدید
   flutter_markdown: ^0.7.2+1       # نمایش پیام‌های AI با مارک‌داون و کد

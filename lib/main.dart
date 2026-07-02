@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
       curve: Curves.easeInOut,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'KAI AI',
+        title: 'Parsa AI',
         // ⚠️ برای پشتیبانی از ThemeMode.system (حالت خودکار) این دو خط را نگه میداریم
         theme: themeProvider.lightThemeData,
         darkTheme: themeProvider.darkThemeData,
