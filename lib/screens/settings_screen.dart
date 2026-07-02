@@ -6,8 +6,25 @@ import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:ambient_light/ambient_light.dart';
+import 'package:palette_generator/palette_generator.dart';
+import 'package:image_picker/image_picker.dart';
 
+// ════════════════════════════ مدیریت زبان (ساده) ════════════════════════════
+class LocaleProvider extends ChangeNotifier {
+  Locale _locale = const Locale('fa');
+  Locale get locale => _locale;
+
+  void setLocale(Locale newLocale) {
+    if (_locale == newLocale) return;
+    _locale = newLocale;
+    notifyListeners();
+  }
+}
+
+// ════════════════════════════ صفحه تنظیمات ════════════════════════════
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -16,142 +33,517 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // لیست تصاویر پس‌زمینهٔ موجود در assets
+  // ----- لیست تصاویر پس‌زمینه -----
   final List<Map<String, String>> _backgroundOptions = [
     {'path': 'assets/images/backgrounds/galaxy_bg.png', 'label': 'کهکشان'},
-    {'path': 'assets/images/backgrounds/nature1.png', 'label': 'طبیعت'},
-    {'path': 'assets/images/backgrounds/nature2.png', 'label': 'طبیعت'},
-    // مسیرهای دیگری که اضافه کرده‌اید
+    {'path': 'assets/images/backgrounds/nature1.png', 'label': 'طبیعت ۱'},
+    {'path': 'assets/images/backgrounds/nature2.png', 'label': 'طبیعت ۲'},
+    // مسیرهای دیگر ...
   ];
+
+  // ----- کنترلرها و مقادیر -----
+  final PageController _bgPageController = PageController(viewportFraction: 0.35);
+  final ImagePicker _imagePicker = ImagePicker();
+
+  // سنسور روشنایی
+  StreamSubscription<double>? _lightSubscription;
+  double _ambientLux = 500; // مقدار پیش‌فرض (روشن)
+  bool _isSmartThemeActive = false;
+
+  // تنظیمات اضافی (ذخیره در SharedPreferences)
+  late SharedPreferences _prefs;
+  bool _incognitoMode = false;
+  double _chatFontSize = 16.0;
+  double _chatLineHeight = 1.5;
+  String _chatFontFamily = 'Vazir'; // فونت پیش‌فرض
+  Color _accentColor = Colors.blue;
+  List<String> _fontFamilies = ['Vazir', 'Sahel', 'Shabnam', 'IranSans'];
+
+  // مدل‌های هوش مصنوعی
+  List _aiModels = [];
+  String? _selectedModelId;
+  bool _modelsLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPrefs();
+    _fetchAIModels();
+    _listenToAmbientLight();
+  }
+
+  Future<void> _initPrefs() async {
+    _prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _incognitoMode = _prefs.getBool('incognito') ?? false;
+      _chatFontSize = _prefs.getDouble('chat_font_size') ?? 16.0;
+      _chatLineHeight = _prefs.getDouble('chat_line_height') ?? 1.5;
+      _chatFontFamily = _prefs.getString('chat_font_family') ?? 'Vazir';
+      int? accentColorValue = _prefs.getInt('accent_color');
+      _accentColor = accentColorValue != null ? Color(accentColorValue) : Colors.blue;
+    });
+  }
+
+  Future<void> _fetchAIModels() async {
+    try {
+      final response = await ApiService.get('models');
+      final List models = jsonDecode(response.body);
+      if (mounted) {
+        setState(() {
+          _aiModels = models;
+          _selectedModelId = models.isNotEmpty ? models.first['id'] : null;
+          _modelsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _modelsLoading = false);
+    }
+  }
+
+  void _listenToAmbientLight() {
+    _lightSubscription = AmbientLight().lightSensorStream.listen((lux) {
+      if (mounted && _isSmartThemeActive) {
+        // آستانه تاریکی: زیر ۳۰ لوکس
+        final themeProv = context.read<ThemeProvider>();
+        if (lux < 30 && themeProv.currentThemeName != 'dark') {
+          themeProv.changeTheme('dark');
+        } else if (lux >= 30 && themeProv.currentThemeName == 'dark') {
+          themeProv.changeTheme('light');
+        }
+      }
+      if (mounted) {
+        setState(() => _ambientLux = lux);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _lightSubscription?.cancel();
+    _bgPageController.dispose();
+    super.dispose();
+  }
+
+  // ذخیره تنظیمات متفرقه
+  Future<void> _saveIncognito(bool val) async {
+    setState(() => _incognitoMode = val);
+    await _prefs.setBool('incognito', val);
+  }
+
+  Future<void> _saveFontSize(double val) async {
+    setState(() => _chatFontSize = val);
+    await _prefs.setDouble('chat_font_size', val);
+  }
+
+  Future<void> _saveLineHeight(double val) async {
+    setState(() => _chatLineHeight = val);
+    await _prefs.setDouble('chat_line_height', val);
+  }
+
+  Future<void> _saveFontFamily(String val) async {
+    setState(() => _chatFontFamily = val);
+    await _prefs.setString('chat_font_family', val);
+  }
+
+  Future<void> _saveAccentColor(Color color) async {
+    setState(() => _accentColor = color);
+    await _prefs.setInt('accent_color', color.value);
+  }
+
+  // ═══════════════════ انتخاب رنگ از عکس (تم جادویی) ═══════════════════
+  Future<void> _createThemeFromImage() async {
+    final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+    final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(
+      FileImage(File(image.path)),
+      size: const Size(200, 200),
+      maximumColorCount: 5,
+    );
+    final dominantColor = palette.dominantColor?.color ?? Colors.blue;
+    _saveAccentColor(dominantColor);
+    // می‌تونی کل تم رو با رنگ‌های پالت بازطراحی کنی، فعلاً فقط اکسنت رو تغییر می‌دیم
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('رنگ اصلی از عکس استخراج شد: ${dominantColor.toString()}')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final themeProv = context.watch<ThemeProvider>();
     final authProv = context.watch<AuthProvider>();
+    final localeProv = context.watch<LocaleProvider>();
+
+    // دریافت رنگ‌های پس‌زمینه و متن بر اساس تم فعلی
+    final Color bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final Color cardColor = Theme.of(context).cardColor.withOpacity(0.7);
+    final Color textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('تنظیمات')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ══════════ ظاهر ══════════
-          const Text('🎨 تم', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          RadioListTile<String>(
-            title: const Text('روشن'),
-            value: 'light',
-            groupValue: themeProv.currentThemeName,
-            onChanged: (v) => themeProv.changeTheme(v!),
-          ),
-          RadioListTile<String>(
-            title: const Text('تاریک'),
-            value: 'dark',
-            groupValue: themeProv.currentThemeName,
-            onChanged: (v) => themeProv.changeTheme(v!),
-          ),
-          RadioListTile<String>(
-            title: const Text('شاد (پاستلی)'),
-            value: 'shad',
-            groupValue: themeProv.currentThemeName,
-            onChanged: (v) => themeProv.changeTheme(v!),
-          ),
-          RadioListTile<String>(
-            title: const Text('کلاسیک'),
-            value: 'classic',
-            groupValue: themeProv.currentThemeName,
-            onChanged: (v) => themeProv.changeTheme(v!),
-          ),
-          RadioListTile<String>(
-            title: const Text('خودکار (بر اساس ساعت)'),
-            value: 'auto',
-            groupValue: themeProv.currentThemeName,
-            onChanged: (v) => themeProv.changeTheme(v!),
-          ),
-
-          const Divider(),
-
-          // ══════════ پس‌زمینه چت ══════════
-          const Text('🖼️ پس‌زمینه چت',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            title: const Text('پویا (بر اساس آب‌وهوا)'),
-            subtitle: const Text('باران، برف، طوفان و...'),
-            value: themeProv.useDynamicBackground,
-            onChanged: (val) {
-              themeProv.setDynamicBackground(val);
-              // اگر پویا فعال شد، تصویر ثابت را غیرفعال کن
-              if (val && themeProv.customBackgroundPath != null) {
-                themeProv.setBackground(null);
-              }
-            },
-          ),
-          const SizedBox(height: 10),
-          const Text('تصویر ثابت:'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              // گزینهٔ پیش‌فرض (بدون تصویر)
-              _backgroundThumbnail(
-                context,
-                path: null,
-                label: 'پیش‌فرض',
-                isSelected: themeProv.customBackgroundPath == null,
+      body: CustomScrollView(
+        slivers: [
+          // ═══════════════════ هدر جمع‌شونده با پروفایل ═══════════════════
+          SliverAppBar(
+            expandedHeight: 200,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_accentColor.withOpacity(0.8), _accentColor.withOpacity(0.3)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 30),
+                    CircleAvatar(
+                      radius: 45,
+                      backgroundColor: Colors.white24,
+                      child: Text(
+                        authProv.user?.name?.isNotEmpty == true
+                            ? authProv.user!.name![0].toUpperCase()
+                            : '👤',
+                        style: const TextStyle(fontSize: 30, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      authProv.user?.name ?? 'کاربر مهمان',
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      authProv.user?.email ?? '',
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
-              // تصاویر موجود
-              for (final option in _backgroundOptions)
-                _backgroundThumbnail(
-                  context,
-                  path: option['path']!,
-                  label: option['label']!,
-                  isSelected: themeProv.customBackgroundPath == option['path'],
-                ),
-            ],
+            ),
+            backgroundColor: _accentColor,
           ),
 
-          const Divider(),
+          // بدنه اصلی
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ═══════════════════ پیش‌نمایش زنده تم ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('👁️ پیش‌نمایش چت', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                        const SizedBox(height: 12),
+                        _ChatPreview(
+                          accentColor: _accentColor,
+                          fontSize: _chatFontSize,
+                          fontFamily: _chatFontFamily,
+                          lineHeight: _chatLineHeight,
+                          bubbleColor: Theme.of(context).colorScheme.primary,
+                          isDark: Theme.of(context).brightness == Brightness.dark,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-          // ══════════ مدل پیش‌فرض ══════════
-          const Text('🤖 هوش مصنوعی پیش‌فرض',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          FutureBuilder<http.Response>(
-            future: ApiService.get('models'),
-            builder: (ctx, snap) {
-              if (!snap.hasData) return const CircularProgressIndicator();
-              final models = jsonDecode(snap.data!.body) as List;
-              return DropdownButtonFormField<String>(
-                items: models.map<DropdownMenuItem<String>>((m) {
-                  return DropdownMenuItem<String>(
-                    value: m['id'] as String,
-                    child: Text(m['name'] as String),
-                  );
-                }).toList(),
-                onChanged: (val) async {
-                  await ApiService.put('settings', {'ai_model': val});
-                },
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                ),
-              );
-            },
-          ),
+                  // ═══════════════════ بخش تم‌ها ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('🎨 انتخاب تم', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                        const SizedBox(height: 12),
+                        _ThemeRadioTile('روشن', 'light', themeProv),
+                        _ThemeRadioTile('تاریک', 'dark', themeProv),
+                        _ThemeRadioTile('شاد (پاستلی)', 'shad', themeProv),
+                        _ThemeRadioTile('کلاسیک', 'classic', themeProv),
+                        // خودکار بر اساس ساعت
+                        RadioListTile<String>(
+                          title: const Text('خودکار (بر اساس ساعت)'),
+                          value: 'auto',
+                          groupValue: _isSmartThemeActive ? '' : themeProv.currentThemeName,
+                          onChanged: (v) {
+                            themeProv.changeTheme(v!);
+                            setState(() => _isSmartThemeActive = false);
+                          },
+                          activeColor: _accentColor,
+                        ),
+                        // هوشمند (نور محیط)
+                        SwitchListTile(
+                          title: const Text('هوشمند (بر اساس نور محیط)'),
+                          subtitle: Text('لوکس فعلی: ${_ambientLux.toStringAsFixed(0)}'),
+                          value: _isSmartThemeActive,
+                          onChanged: (val) {
+                            setState(() => _isSmartThemeActive = val);
+                            if (val) {
+                              // فوراً بر اساس لوکس فعلی تم رو تنظیم کن
+                              if (_ambientLux < 30) {
+                                themeProv.changeTheme('dark');
+                              } else {
+                                themeProv.changeTheme('light');
+                              }
+                            }
+                          },
+                          activeColor: _accentColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-          const SizedBox(height: 30),
+                  // ═══════════════════ رنگ اکسنت دلخواه ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('🌈 رنگ اصلی (Accent)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              Colors.red, Colors.pink, Colors.purple, Colors.deepPurple,
+                              Colors.indigo, Colors.blue, Colors.lightBlue, Colors.cyan,
+                              Colors.teal, Colors.green, Colors.lightGreen, Colors.lime,
+                              Colors.yellow, Colors.amber, Colors.orange, Colors.deepOrange,
+                            ].map((color) => _ColorCircle(
+                                  color: color,
+                                  isSelected: _accentColor.value == color.value,
+                                  onTap: () => _saveAccentColor(color),
+                                )).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.auto_awesome),
+                          label: const Text('ساخت تم از عکس'),
+                          onPressed: _createThemeFromImage,
+                          style: OutlinedButton.styleFrom(foregroundColor: _accentColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-          // ══════════ خروج ══════════
-          OutlinedButton.icon(
-            onPressed: () {
-              authProv.logout();
-              Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
-            },
-            icon: const FaIcon(FontAwesomeIcons.rightFromBracket),
-            label: const Text('خروج از حساب'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              foregroundColor: Colors.red,
-              side: const BorderSide(color: Colors.red),
+                  // ═══════════════════ پس‌زمینه چت ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('🖼️ پس‌زمینه چت', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                        const SizedBox(height: 10),
+                        SwitchListTile(
+                          title: const Text('پویا (آب‌وهوا)'),
+                          value: themeProv.useDynamicBackground,
+                          onChanged: (val) {
+                            themeProv.setDynamicBackground(val);
+                            if (val && themeProv.customBackgroundPath != null) {
+                              themeProv.setBackground(null);
+                            }
+                          },
+                          activeColor: _accentColor,
+                        ),
+                        const SizedBox(height: 10),
+                        // گالری افقی تصاویر
+                        SizedBox(
+                          height: 120,
+                          child: PageView.builder(
+                            controller: _bgPageController,
+                            itemCount: _backgroundOptions.length + 1, // +1 برای پیش‌فرض
+                            itemBuilder: (context, index) {
+                              final isDefault = index == 0;
+                              final String? path = isDefault ? null : _backgroundOptions[index - 1]['path'];
+                              final String label = isDefault ? 'پیش‌فرض' : _backgroundOptions[index - 1]['label']!;
+                              final isSelected = isDefault
+                                  ? themeProv.customBackgroundPath == null
+                                  : themeProv.customBackgroundPath == path;
+
+                              return _BgCarouselItem(
+                                path: path,
+                                label: label,
+                                isSelected: isSelected,
+                                onTap: () {
+                                  themeProv.setBackground(path);
+                                  if (path != null && themeProv.useDynamicBackground) {
+                                    themeProv.setDynamicBackground(false);
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ═══════════════════ مدل هوش مصنوعی ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('🤖 مدل پیش‌فرض', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                        const SizedBox(height: 10),
+                        if (_modelsLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: _selectedModelId,
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    filled: true,
+                                    fillColor: Colors.white.withOpacity(0.2),
+                                  ),
+                                  items: _aiModels.map<DropdownMenuItem<String>>((m) {
+                                    return DropdownMenuItem<String>(
+                                      value: m['id'] as String,
+                                      child: Text(m['name'] as String),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) async {
+                                    setState(() => _selectedModelId = val);
+                                    await ApiService.put('settings', {'ai_model': val});
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              IconButton(
+                                icon: const Icon(Icons.speed),
+                                tooltip: 'تست سرعت',
+                                onPressed: _testModelSpeed,
+                                color: _accentColor,
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ═══════════════════ تایپوگرافی چت ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('✍️ اندازه و فونت پیام‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                        const SizedBox(height: 10),
+                        // سایز فونت
+                        Row(
+                          children: [
+                            const Text('اندازه فونت:'),
+                            Expanded(
+                              child: Slider(
+                                value: _chatFontSize,
+                                min: 12,
+                                max: 24,
+                                divisions: 12,
+                                label: _chatFontSize.round().toString(),
+                                activeColor: _accentColor,
+                                onChanged: _saveFontSize,
+                              ),
+                            ),
+                            Text(_chatFontSize.toStringAsFixed(0)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // فاصله خطوط
+                        Row(
+                          children: [
+                            const Text('فاصله خطوط:'),
+                            Expanded(
+                              child: Slider(
+                                value: _chatLineHeight,
+                                min: 1.0,
+                                max: 2.5,
+                                divisions: 6,
+                                label: _chatLineHeight.toStringAsFixed(1),
+                                activeColor: _accentColor,
+                                onChanged: _saveLineHeight,
+                              ),
+                            ),
+                            Text(_chatLineHeight.toStringAsFixed(1)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // انتخاب فونت
+                        DropdownButtonFormField<String>(
+                          value: _chatFontFamily,
+                          decoration: InputDecoration(
+                            labelText: 'فونت',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.2),
+                          ),
+                          items: _fontFamilies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+                          onChanged: (val) => _saveFontFamily(val!),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ═══════════════════ سایر تنظیمات ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      children: [
+                        SwitchListTile(
+                          title: const Text('🕶️ حالت ناشناس (Incognito)'),
+                          subtitle: const Text('تاریخچه چت ذخیره نمی‌شود'),
+                          value: _incognitoMode,
+                          onChanged: _saveIncognito,
+                          activeColor: _accentColor,
+                        ),
+                        const Divider(),
+                        // زبان
+                        ListTile(
+                          title: const Text('🌐 زبان برنامه'),
+                          trailing: DropdownButton<Locale>(
+                            value: localeProv.locale,
+                            underline: const SizedBox(),
+                            items: const [
+                              DropdownMenuItem(value: Locale('fa'), child: Text('فارسی')),
+                              DropdownMenuItem(value: Locale('en'), child: Text('English')),
+                            ],
+                            onChanged: (loc) {
+                              if (loc != null) {
+                                localeProv.setLocale(loc);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ═══════════════════ بخش حساب کاربری و خروج ═══════════════════
+                  _buildGlassCard(
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.logout, color: Colors.red),
+                          title: const Text('خروج از حساب', style: TextStyle(color: Colors.red)),
+                          onTap: () => _showLogoutDialog(context, authProv),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
           ),
         ],
@@ -159,53 +551,260 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _backgroundThumbnail(
-    BuildContext context, {
-    required String? path,
-    required String label,
-    required bool isSelected,
-  }) {
-    final themeProv = context.read<ThemeProvider>();
-    return GestureDetector(
-      onTap: () {
-        themeProv.setBackground(path);
-        // اگر تصویر ثابت انتخاب شد، پس‌زمینهٔ پویا را غیرفعال کن
-        if (path != null && themeProv.useDynamicBackground) {
-          themeProv.setDynamicBackground(false);
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 120,
-            decoration: BoxDecoration(
-              color: path == null ? Colors.grey[300] : null,
-              image: path != null
-                  ? DecorationImage(
-                      image: AssetImage(path),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-              border: Border.all(
-                color: isSelected
-                    ? Theme.of(context).primaryColor
-                    : Colors.grey.shade400,
-                width: isSelected ? 3 : 1,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: path == null
-                ? const Center(
-                    child: Text('بدون\nتصویر',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12)))
-                : null,
+  // ═══════════════════ ویجت‌های کمکی ═══════════════════
+
+  Widget _buildGlassCard({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ColorFilter.mode(Colors.white.withOpacity(0.1), BlendMode.srcOver),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white24),
+            boxShadow: [
+              BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 11)),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _ThemeRadioTile(String title, String value, ThemeProvider themeProv) {
+    return RadioListTile<String>(
+      title: Text(title),
+      value: value,
+      groupValue: _isSmartThemeActive ? '' : themeProv.currentThemeName,
+      onChanged: (v) {
+        themeProv.changeTheme(v!);
+        setState(() => _isSmartThemeActive = false);
+      },
+      activeColor: _accentColor,
+    );
+  }
+
+  Widget _ColorCircle({required Color color, required bool isSelected, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color,
+            border: Border.all(
+              color: isSelected ? Colors.white : Colors.transparent,
+              width: 3,
+            ),
+            boxShadow: isSelected ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)] : [],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _testModelSpeed() async {
+    if (_selectedModelId == null) return;
+    final stopwatch = Stopwatch()..start();
+    try {
+      final response = await ApiService.post('test_model', {'model': _selectedModelId});
+      stopwatch.stop();
+      if (mounted) {
+        final ms = stopwatch.elapsedMilliseconds;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('سرعت پاسخگویی'),
+            content: Text('مدل ${_selectedModelId} در $ms میلی‌ثانیه پاسخ داد.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('باشه'))],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('خطا'),
+            content: Text('تست ناموفق: $e'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('باشه'))],
+          ),
+        );
+      }
+    }
+  }
+
+  void _showLogoutDialog(BuildContext context, AuthProvider authProv) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      pageBuilder: (ctx, anim1, anim2) => Container(),
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        final curved = CurvedAnimation(parent: anim1, curve: Curves.easeInOutBack);
+        return ScaleTransition(
+          scale: curved,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber, color: Colors.red),
+                SizedBox(width: 10),
+                Text('خروج از حساب'),
+              ],
+            ),
+            content: const Text('آیا مطمئن هستید که می‌خواهید خارج شوید؟'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () {
+                  authProv.logout();
+                  Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+                },
+                child: const Text('خروج', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ═══════════════════ ویجت پیش‌نمایش چت (واکنش‌گرا به تنظیمات) ═══════════════════
+class _ChatPreview extends StatelessWidget {
+  final Color accentColor;
+  final double fontSize;
+  final String fontFamily;
+  final double lineHeight;
+  final Color bubbleColor;
+  final bool isDark;
+
+  const _ChatPreview({
+    required this.accentColor,
+    required this.fontSize,
+    required this.fontFamily,
+    required this.lineHeight,
+    required this.bubbleColor,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: isDark ? [Colors.grey[850]!, Colors.grey[900]!] : [Colors.grey[100]!, Colors.white],
+        ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          // حباب فرستنده (راست)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: accentColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+              ),
+              child: Text(
+                'سلام! حالت چطوره؟',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: fontSize,
+                  fontFamily: fontFamily,
+                  height: lineHeight,
+                ),
+                textDirection: TextDirection.rtl,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // حباب گیرنده (چپ)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[700] : Colors.grey[300],
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Text(
+                'خوبم، مرسی!',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: fontSize,
+                  fontFamily: fontFamily,
+                  height: lineHeight,
+                ),
+                textDirection: TextDirection.rtl,
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════ آیتم کاروسل پس‌زمینه ═══════════════════
+class _BgCarouselItem extends StatelessWidget {
+  final String? path;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _BgCarouselItem({
+    required this.path,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: path == null ? Colors.grey[300] : null,
+          image: path != null ? DecorationImage(image: AssetImage(path), fit: BoxFit.cover) : null,
+          border: Border.all(
+            color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade400,
+            width: isSelected ? 3 : 1,
+          ),
+          boxShadow: isSelected
+              ? [BoxShadow(color: Theme.of(context).primaryColor.withOpacity(0.4), blurRadius: 8)]
+              : [],
+        ),
+        child: path == null
+            ? Center(child: Text('بدون\nتصویر', textAlign: TextAlign.center, style: TextStyle(fontSize: 12)))
+            : null,
       ),
     );
   }
