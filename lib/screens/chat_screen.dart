@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -10,7 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';   // AppThemeMode از اینجا میاد
+import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import '../services/local_db.dart';
 import '../services/weather_service.dart';
@@ -66,6 +67,69 @@ class _ScrollDownButton extends StatelessWidget {
   }
 }
 
+// ─── پس‌زمینه حباب‌های زیبا ─────────────────────────
+class _BubblesBackground extends StatefulWidget {
+  @override
+  _BubblesBackgroundState createState() => _BubblesBackgroundState();
+}
+
+class _BubblesBackgroundState extends State<_BubblesBackground>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, child) => CustomPaint(
+        painter: _BubblesPainter(_controller.value),
+      ),
+    );
+  }
+}
+
+class _BubblesPainter extends CustomPainter {
+  final double progress;
+  _BubblesPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = Random(42);
+    final paint = Paint()
+      ..style = PaintingStyle.fill
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    for (int i = 0; i < 20; i++) {
+      final x = size.width * (0.1 + rng.nextDouble() * 0.8);
+      final baseY = size.height * (0.2 + rng.nextDouble() * 0.7);
+      final y = (baseY - progress * 200) % (size.height + 100) - 50;
+      final radius = 8 + rng.nextDouble() * 24;
+      final opacity = 0.08 + rng.nextDouble() * 0.12;
+      final color = Colors.white.withOpacity(opacity);
+      paint.color = color;
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
 // ═══════════════════ ChatScreen ═══════════════════════
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
@@ -79,7 +143,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final _msgController = TextEditingController();
   final _scrollController = ScrollController();
 
-  List<dynamic> _displayItems = [];       // شامل پیام‌ها + جداکننده‌ها
+  List<dynamic> _displayItems = [];
   List<Map<String, dynamic>> _messages = [];
   String? _currentConvId;
   String _modelId = 'text';
@@ -90,15 +154,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   bool _showScrollDown = false;
 
-  // زبان (fa/en)
   String _language = 'fa';
 
-  // Immersive AppBar
   late AnimationController _appBarAnimCtrl;
   late Animation<Offset> _appBarSlide;
   bool _showImmersiveAppBar = false;
 
-  // واکنش‌های سریع
   final List<String> _reactions = ['👍', '👎', '❤️', '🔥', '😮', '💡'];
 
   @override
@@ -130,7 +191,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // ─── اسکرول ───────────────────────────────────────
   void _scrollListener() {
     if (!_scrollController.hasClients) return;
     final maxScroll = _scrollController.position.maxScrollExtent;
@@ -148,7 +208,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ─── آب و هوا ──────────────────────────────────────
   Future<void> _fetchWeather() async {
     final prefs = await SharedPreferences.getInstance();
     final useDynamic = prefs.getBool('use_dynamic_background') ?? false;
@@ -157,7 +216,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (mounted) setState(() => _weatherData = data);
   }
 
-  // ─── ساخت لیست نمایشی (تاریخ‌ها) ──────────────────
   void _buildDisplayItems() {
     _displayItems.clear();
     if (_messages.isEmpty) return;
@@ -189,7 +247,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ─── بارگذاری پیام‌ها ─────────────────────────────
   Future<void> _loadMessages() async {
     try {
       final res = await ApiService.get('conversations/$_currentConvId/messages');
@@ -250,39 +307,72 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
-  // ─── ارسال پیام (دو زبانه) ────────────────────────
+  // ─── ترجمه با MyMemory (رایگان) ─────────────────────
+  Future<String> _translateText(String text, String from, String to) async {
+    try {
+      final uri = Uri.parse(
+        'https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(text)}&langpair=$from|$to',
+      );
+      final res = await http.get(uri);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return data['responseData']['translatedText'] ?? text;
+      }
+    } catch (_) {}
+    return text; // fallback
+  }
+
+  // ─── ارسال پیام (با ترجمه خودکار انگلیسی) ─────────
   Future<void> _sendMessage() async {
     if (_msgController.text.trim().isEmpty || _currentConvId == null || _isSending) return;
 
-    final message = _msgController.text.trim();
+    final originalMessage = _msgController.text.trim();
     _msgController.clear();
     setState(() => _isSending = true);
 
     final now = DateTime.now().toIso8601String();
+    // پیام کاربر (نمایش داده می‌شود)
     setState(() {
-      _messages.add({'role': 'user', 'content': message, 'timestamp': now, 'reaction': null});
+      _messages.add({
+        'role': 'user',
+        'content': originalMessage,
+        'timestamp': now,
+        'reaction': null,
+      });
       _buildDisplayItems();
     });
 
     HapticFeedback.mediumImpact();
     _scrollToBottom();
 
+    // تعیین پیام ارسالی به سرور (در صورت انگلیسی بودن ترجمه به فارسی)
+    String messageForServer = originalMessage;
+    if (_language == 'en') {
+      messageForServer = await _translateText(originalMessage, 'en', 'fa');
+    }
+
     try {
       final res = await ApiService.post('chat/send', {
         'conversation_id': _currentConvId,
-        'message': message,
+        'message': messageForServer,
         'model_id': _modelId,
-        'language': _language,
+        'language': 'fa', // سرور همیشه پاسخ فارسی می‌دهد
       });
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         HapticFeedback.lightImpact();
 
+        String aiResponse = data['ai_response'];
+        // اگر انگلیسی باشد، پاسخ را از فارسی به انگلیسی برگردان
+        if (_language == 'en') {
+          aiResponse = await _translateText(aiResponse, 'fa', 'en');
+        }
+
         setState(() {
           _messages.add({
             'role': 'ai',
-            'content': data['ai_response'],
+            'content': aiResponse,
             'feedback': null,
             'timestamp': DateTime.now().toIso8601String(),
             'reaction': null,
@@ -294,7 +384,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         LocalDatabase.saveMessage({
           'conversation_id': _currentConvId,
           'role': 'ai',
-          'content': data['ai_response'],
+          'content': aiResponse,
           'timestamp': DateTime.now().toIso8601String(),
         });
         _scrollToBottom();
@@ -313,7 +403,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     setState(() => _isSending = false);
   }
 
-  // ─── Quick Reactions ──────────────────────────────
   void _showReactionPicker(int messageIndex) {
     final msg = _messages[messageIndex];
     showModalBottomSheet(
@@ -341,7 +430,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ─── منوی طولانی ─────────────────────────────────
   void _showMessageMenu(int messageIndex) {
     final msg = _messages[messageIndex];
     final isUser = msg['role'] == 'user';
@@ -398,7 +486,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ─── پین / آرشیو ──────────────────────────────────
   Future<void> _togglePin() async {
     if (_currentConvId == null) return;
     try {
@@ -430,7 +517,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
-  // ─── Immersive هوشمند ─────────────────────────────
   void _toggleImmersive() {
     setState(() => _isImmersive = !_isImmersive);
     if (_isImmersive) {
@@ -458,7 +544,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ─── انتخاب‌گر مدل ────────────────────────────────
   void _showModelPicker() {
     showModalBottomSheet(
       context: context,
@@ -533,7 +618,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ─── تغییر زبان (دو زبانه) ────────────────────────
   void _toggleLanguage() {
     setState(() => _language = _language == 'fa' ? 'en' : 'fa');
     HapticFeedback.selectionClick();
@@ -545,7 +629,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ─── شکل حباب بر اساس AppThemeMode ─────────────────
   BorderRadius _bubbleBorderRadius(AppThemeMode mode, {required bool isUser}) {
     switch (mode) {
       case AppThemeMode.happy:
@@ -567,14 +650,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ═══════════════════ build ═══════════════════════
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final themeProv = context.watch<ThemeProvider>();
-    final appThemeMode = themeProv.appThemeMode;  // AppThemeMode از ThemeProvider
+    final appThemeMode = themeProv.appThemeMode;
+    final useDynamicBg = themeProv.useDynamicBackground;
+    final customBgPath = themeProv.customBackgroundPath;
 
-    // رشته‌های دو زبانه
     final hintText = _language == 'fa' ? 'پیام خود را بنویسید...' : 'Type your message...';
     final newChatLabel = _language == 'fa' ? 'گفتگوی جدید' : 'New Chat';
     final pinLabel = _language == 'fa' ? 'پین' : 'Pin';
@@ -582,7 +665,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     final fullscreenLabel = _language == 'fa' ? 'تمام‌صفحه' : 'Fullscreen';
     final modelLabel = _language == 'fa' ? 'مدل' : 'Model';
 
-    // اپ‌بار Immersive شناور
     Widget? immersiveAppBar;
     if (_isImmersive && _showImmersiveAppBar) {
       immersiveAppBar = SlideTransition(
@@ -604,7 +686,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       );
     }
 
-    // لیست چت
     Widget chatList = ListView.builder(
       controller: _scrollController,
       itemCount: _displayItems.length,
@@ -722,16 +803,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       ],
     );
 
+    // پس‌زمینه (آب‌وهوا یا تصویر سفارشی)
     Widget backgroundWrapper = WeatherBackground(
       weatherData: _weatherData,
       child: bodyContent,
     );
 
-    if (!themeProv.useDynamicBackground && themeProv.customBackgroundPath != null) {
+    if (!useDynamicBg && customBgPath != null) {
       backgroundWrapper = Stack(
         children: [
           Positioned.fill(
-            child: Image.asset(themeProv.customBackgroundPath!, fit: BoxFit.cover),
+            child: Image.asset(customBgPath, fit: BoxFit.cover),
           ),
           backgroundWrapper,
         ],
@@ -790,6 +872,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       ),
       body: Stack(
         children: [
+          // حباب‌های زیبا فقط وقتی پس‌زمینه تصویر سفارشی و آب‌وهوا فعال نباشد
+          if (customBgPath == null && !useDynamicBg)
+            Positioned.fill(child: _BubblesBackground()),
           backgroundWrapper,
           if (immersiveAppBar != null)
             Positioned(top: 0, left: 0, right: 0, child: immersiveAppBar),
