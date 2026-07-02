@@ -1,18 +1,19 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io'; // <-- برای استفاده از File
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';
-import '../services/api_service.dart';
-import 'dart:convert';
-import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:ambient_light/ambient_light.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:image_picker/image_picker.dart';
+import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
+import '../services/api_service.dart';
 
-// ════════════════════════════ مدیریت زبان (ساده) ════════════════════════════
+// مدیریت ساده‌ی زبان (برای تغییر locale)
 class LocaleProvider extends ChangeNotifier {
   Locale _locale = const Locale('fa');
   Locale get locale => _locale;
@@ -24,7 +25,6 @@ class LocaleProvider extends ChangeNotifier {
   }
 }
 
-// ════════════════════════════ صفحه تنظیمات ════════════════════════════
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -33,33 +33,27 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // ----- لیست تصاویر پس‌زمینه -----
   final List<Map<String, String>> _backgroundOptions = [
     {'path': 'assets/images/backgrounds/galaxy_bg.png', 'label': 'کهکشان'},
     {'path': 'assets/images/backgrounds/nature1.png', 'label': 'طبیعت ۱'},
     {'path': 'assets/images/backgrounds/nature2.png', 'label': 'طبیعت ۲'},
-    // مسیرهای دیگر ...
   ];
 
-  // ----- کنترلرها و مقادیر -----
   final PageController _bgPageController = PageController(viewportFraction: 0.35);
   final ImagePicker _imagePicker = ImagePicker();
 
-  // سنسور روشنایی
   StreamSubscription<double>? _lightSubscription;
-  double _ambientLux = 500; // مقدار پیش‌فرض (روشن)
+  double _ambientLux = 500;
   bool _isSmartThemeActive = false;
 
-  // تنظیمات اضافی (ذخیره در SharedPreferences)
   late SharedPreferences _prefs;
   bool _incognitoMode = false;
   double _chatFontSize = 16.0;
   double _chatLineHeight = 1.5;
-  String _chatFontFamily = 'Vazir'; // فونت پیش‌فرض
+  String _chatFontFamily = 'Vazir';
   Color _accentColor = Colors.blue;
-  List<String> _fontFamilies = ['Vazir', 'Sahel', 'Shabnam', 'IranSans'];
+  final List<String> _fontFamilies = ['Vazir', 'Sahel', 'Shabnam', 'IranSans'];
 
-  // مدل‌های هوش مصنوعی
   List _aiModels = [];
   String? _selectedModelId;
   bool _modelsLoading = true;
@@ -79,7 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _chatFontSize = _prefs.getDouble('chat_font_size') ?? 16.0;
       _chatLineHeight = _prefs.getDouble('chat_line_height') ?? 1.5;
       _chatFontFamily = _prefs.getString('chat_font_family') ?? 'Vazir';
-      int? accentColorValue = _prefs.getInt('accent_color');
+      final int? accentColorValue = _prefs.getInt('accent_color');
       _accentColor = accentColorValue != null ? Color(accentColorValue) : Colors.blue;
     });
   }
@@ -101,9 +95,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _listenToAmbientLight() {
-    _lightSubscription = AmbientLight().lightSensorStream.listen((lux) {
+    // در نسخه 0.1.4 از ambient_light، stream به این صورت در دسترس است
+    _lightSubscription = AmbientLight().lightLevelStream.listen((lux) {
       if (mounted && _isSmartThemeActive) {
-        // آستانه تاریکی: زیر ۳۰ لوکس
         final themeProv = context.read<ThemeProvider>();
         if (lux < 30 && themeProv.currentThemeName != 'dark') {
           themeProv.changeTheme('dark');
@@ -111,9 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           themeProv.changeTheme('light');
         }
       }
-      if (mounted) {
-        setState(() => _ambientLux = lux);
-      }
+      if (mounted) setState(() => _ambientLux = lux);
     });
   }
 
@@ -124,7 +116,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  // ذخیره تنظیمات متفرقه
   Future<void> _saveIncognito(bool val) async {
     setState(() => _incognitoMode = val);
     await _prefs.setBool('incognito', val);
@@ -150,18 +141,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _prefs.setInt('accent_color', color.value);
   }
 
-  // ═══════════════════ انتخاب رنگ از عکس (تم جادویی) ═══════════════════
   Future<void> _createThemeFromImage() async {
     final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
     final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(
-      FileImage(File(image.path)),
+      FileImage(File(image.path)), // File از dart:io
       size: const Size(200, 200),
       maximumColorCount: 5,
     );
     final dominantColor = palette.dominantColor?.color ?? Colors.blue;
     _saveAccentColor(dominantColor);
-    // می‌تونی کل تم رو با رنگ‌های پالت بازطراحی کنی، فعلاً فقط اکسنت رو تغییر می‌دیم
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('رنگ اصلی از عکس استخراج شد: ${dominantColor.toString()}')),
@@ -175,15 +164,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final authProv = context.watch<AuthProvider>();
     final localeProv = context.watch<LocaleProvider>();
 
-    // دریافت رنگ‌های پس‌زمینه و متن بر اساس تم فعلی
-    final Color bgColor = Theme.of(context).scaffoldBackgroundColor;
-    final Color cardColor = Theme.of(context).cardColor.withOpacity(0.7);
     final Color textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // ═══════════════════ هدر جمع‌شونده با پروفایل ═══════════════════
+          // هدر جمع‌شونده
           SliverAppBar(
             expandedHeight: 200,
             pinned: true,
@@ -204,19 +190,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       radius: 45,
                       backgroundColor: Colors.white24,
                       child: Text(
-                        authProv.user?.name?.isNotEmpty == true
-                            ? authProv.user!.name![0].toUpperCase()
+                        authProv.user != null && authProv.user!['name'] != null
+                            ? authProv.user!['name'][0].toUpperCase()
                             : '👤',
                         style: const TextStyle(fontSize: 30, color: Colors.white),
                       ),
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      authProv.user?.name ?? 'کاربر مهمان',
+                      authProv.user?['name'] ?? 'کاربر مهمان',
                       style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      authProv.user?.email ?? '',
+                      authProv.user?['email'] ?? '',
                       style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
@@ -226,14 +212,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             backgroundColor: _accentColor,
           ),
 
-          // بدنه اصلی
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ═══════════════════ پیش‌نمایش زنده تم ═══════════════════
+                  // پیش‌نمایش چت
                   _buildGlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,7 +238,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ═══════════════════ بخش تم‌ها ═══════════════════
+                  // انتخاب تم
                   _buildGlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,7 +249,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _ThemeRadioTile('تاریک', 'dark', themeProv),
                         _ThemeRadioTile('شاد (پاستلی)', 'shad', themeProv),
                         _ThemeRadioTile('کلاسیک', 'classic', themeProv),
-                        // خودکار بر اساس ساعت
                         RadioListTile<String>(
                           title: const Text('خودکار (بر اساس ساعت)'),
                           value: 'auto',
@@ -275,7 +259,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                           activeColor: _accentColor,
                         ),
-                        // هوشمند (نور محیط)
                         SwitchListTile(
                           title: const Text('هوشمند (بر اساس نور محیط)'),
                           subtitle: Text('لوکس فعلی: ${_ambientLux.toStringAsFixed(0)}'),
@@ -283,7 +266,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onChanged: (val) {
                             setState(() => _isSmartThemeActive = val);
                             if (val) {
-                              // فوراً بر اساس لوکس فعلی تم رو تنظیم کن
                               if (_ambientLux < 30) {
                                 themeProv.changeTheme('dark');
                               } else {
@@ -298,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ═══════════════════ رنگ اکسنت دلخواه ═══════════════════
+                  // رنگ اکسنت
                   _buildGlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,10 +296,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               Colors.teal, Colors.green, Colors.lightGreen, Colors.lime,
                               Colors.yellow, Colors.amber, Colors.orange, Colors.deepOrange,
                             ].map((color) => _ColorCircle(
-                                  color: color,
-                                  isSelected: _accentColor.value == color.value,
-                                  onTap: () => _saveAccentColor(color),
-                                )).toList(),
+                              color: color,
+                              isSelected: _accentColor.value == color.value,
+                              onTap: () => _saveAccentColor(color),
+                            )).toList(),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -332,7 +314,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ═══════════════════ پس‌زمینه چت ═══════════════════
+                  // پس‌زمینه چت
                   _buildGlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,12 +333,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           activeColor: _accentColor,
                         ),
                         const SizedBox(height: 10),
-                        // گالری افقی تصاویر
                         SizedBox(
                           height: 120,
                           child: PageView.builder(
                             controller: _bgPageController,
-                            itemCount: _backgroundOptions.length + 1, // +1 برای پیش‌فرض
+                            itemCount: _backgroundOptions.length + 1,
                             itemBuilder: (context, index) {
                               final isDefault = index == 0;
                               final String? path = isDefault ? null : _backgroundOptions[index - 1]['path'];
@@ -364,7 +345,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               final isSelected = isDefault
                                   ? themeProv.customBackgroundPath == null
                                   : themeProv.customBackgroundPath == path;
-
                               return _BgCarouselItem(
                                 path: path,
                                 label: label,
@@ -384,7 +364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ═══════════════════ مدل هوش مصنوعی ═══════════════════
+                  // مدل هوش مصنوعی
                   _buildGlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,9 +380,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 child: DropdownButtonFormField<String>(
                                   value: _selectedModelId,
                                   decoration: InputDecoration(
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                                     filled: true,
                                     fillColor: Colors.white.withOpacity(0.2),
@@ -433,14 +411,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ═══════════════════ تایپوگرافی چت ═══════════════════
+                  // تایپوگرافی
                   _buildGlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('✍️ اندازه و فونت پیام‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
                         const SizedBox(height: 10),
-                        // سایز فونت
                         Row(
                           children: [
                             const Text('اندازه فونت:'),
@@ -459,7 +436,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // فاصله خطوط
                         Row(
                           children: [
                             const Text('فاصله خطوط:'),
@@ -478,7 +454,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // انتخاب فونت
                         DropdownButtonFormField<String>(
                           value: _chatFontFamily,
                           decoration: InputDecoration(
@@ -495,7 +470,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ═══════════════════ سایر تنظیمات ═══════════════════
+                  // سایر تنظیمات
                   _buildGlassCard(
                     child: Column(
                       children: [
@@ -507,7 +482,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           activeColor: _accentColor,
                         ),
                         const Divider(),
-                        // زبان
                         ListTile(
                           title: const Text('🌐 زبان برنامه'),
                           trailing: DropdownButton<Locale>(
@@ -529,7 +503,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ═══════════════════ بخش حساب کاربری و خروج ═══════════════════
+                  // حساب کاربری و خروج
                   _buildGlassCard(
                     child: Column(
                       children: [
@@ -551,8 +525,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ═══════════════════ ویجت‌های کمکی ═══════════════════
-
   Widget _buildGlassCard({required Widget child}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -566,7 +538,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white24),
             boxShadow: [
-              BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+              BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 4)),
             ],
           ),
           child: child,
@@ -622,7 +594,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('سرعت پاسخگویی'),
-            content: Text('مدل ${_selectedModelId} در $ms میلی‌ثانیه پاسخ داد.'),
+            content: Text('مدل $_selectedModelId در $ms میلی‌ثانیه پاسخ داد.'),
             actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('باشه'))],
           ),
         );
@@ -679,7 +651,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// ═══════════════════ ویجت پیش‌نمایش چت (واکنش‌گرا به تنظیمات) ═══════════════════
+// ویجت پیش‌نمایش چت
 class _ChatPreview extends StatelessWidget {
   final Color accentColor;
   final double fontSize;
@@ -710,7 +682,6 @@ class _ChatPreview extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
-          // حباب فرستنده (راست)
           Align(
             alignment: Alignment.centerRight,
             child: Container(
@@ -737,7 +708,6 @@ class _ChatPreview extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // حباب گیرنده (چپ)
           Align(
             alignment: Alignment.centerLeft,
             child: Container(
@@ -769,7 +739,7 @@ class _ChatPreview extends StatelessWidget {
   }
 }
 
-// ═══════════════════ آیتم کاروسل پس‌زمینه ═══════════════════
+// آیتم کاروسل پس‌زمینه
 class _BgCarouselItem extends StatelessWidget {
   final String? path;
   final String label;
@@ -785,6 +755,8 @@ class _BgCarouselItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // برای جلوگیری از خطای nullable در AssetImage
+    final String? bgPath = path;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -792,8 +764,8 @@ class _BgCarouselItem extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: path == null ? Colors.grey[300] : null,
-          image: path != null ? DecorationImage(image: AssetImage(path), fit: BoxFit.cover) : null,
+          color: bgPath == null ? Colors.grey[300] : null,
+          image: bgPath != null ? DecorationImage(image: AssetImage(bgPath), fit: BoxFit.cover) : null,
           border: Border.all(
             color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade400,
             width: isSelected ? 3 : 1,
@@ -802,8 +774,8 @@ class _BgCarouselItem extends StatelessWidget {
               ? [BoxShadow(color: Theme.of(context).primaryColor.withOpacity(0.4), blurRadius: 8)]
               : [],
         ),
-        child: path == null
-            ? Center(child: Text('بدون\nتصویر', textAlign: TextAlign.center, style: TextStyle(fontSize: 12)))
+        child: bgPath == null
+            ? const Center(child: Text('بدون\nتصویر', textAlign: TextAlign.center, style: TextStyle(fontSize: 12)))
             : null,
       ),
     );
