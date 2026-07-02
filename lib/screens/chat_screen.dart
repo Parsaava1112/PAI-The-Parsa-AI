@@ -10,7 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';
+import '../providers/theme_provider.dart';   // AppThemeMode از اینجا میاد
 import '../services/api_service.dart';
 import '../services/local_db.dart';
 import '../services/weather_service.dart';
@@ -19,37 +19,7 @@ import '../widgets/chat_bubble.dart';
 import '../widgets/weather_background.dart';
 import '../routes/custom_page_route.dart';
 
-// ─── تعریف تم‌های اپ (با انیمیشن و شکل حباب متفاوت) ────
-enum AppThemeMode {
-  light,
-  dark,
-  happy,
-  nature,
-  cyberpunk,
-}
-
-extension AppThemeModeExtension on AppThemeMode {
-  String get label {
-    switch (this) {
-      case AppThemeMode.light: return 'روشن';
-      case AppThemeMode.dark: return 'تاریک';
-      case AppThemeMode.happy: return 'شاد';
-      case AppThemeMode.nature: return 'طبیعت';
-      case AppThemeMode.cyberpunk: return 'سایبرپانک';
-    }
-  }
-  IconData get icon {
-    switch (this) {
-      case AppThemeMode.light: return Icons.wb_sunny;
-      case AppThemeMode.dark: return Icons.nightlight_round;
-      case AppThemeMode.happy: return Icons.emoji_emotions;
-      case AppThemeMode.nature: return Icons.eco;
-      case AppThemeMode.cyberpunk: return Icons.memory;
-    }
-  }
-}
-
-// ─── رنگ اختصاصی هر مدل هوش مصنوعی ──────────────────
+// ─── رنگ اختصاصی هر مدل ──────────────────────────────
 const Map<String, Color> kModelColors = {
   'text': Color(0xFF4CAF50),
   'creative': Color(0xFF9C27B0),
@@ -57,7 +27,7 @@ const Map<String, Color> kModelColors = {
   'vision': Color(0xFFFF9800),
 };
 
-// ─── جداکننده تاریخ در چت ────────────────────────────
+// ─── جداکننده تاریخ ──────────────────────────────────
 class _DateSeparator extends StatelessWidget {
   final String text;
   const _DateSeparator(this.text);
@@ -79,7 +49,7 @@ class _DateSeparator extends StatelessWidget {
   }
 }
 
-// ─── دکمه هوشمند اسکرول به پایین ────────────────────
+// ─── دکمه اسکرول هوشمند ──────────────────────────────
 class _ScrollDownButton extends StatelessWidget {
   final VoidCallback onPressed;
   const _ScrollDownButton({required this.onPressed});
@@ -96,7 +66,7 @@ class _ScrollDownButton extends StatelessWidget {
   }
 }
 
-// ═══════════════════ صفحه اصلی چت ═══════════════════
+// ═══════════════════ ChatScreen ═══════════════════════
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
   const ChatScreen({super.key, this.conversationId});
@@ -109,8 +79,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final _msgController = TextEditingController();
   final _scrollController = ScrollController();
 
-  // داده‌ها
-  List<dynamic> _displayItems = [];      // شامل پیام‌ها + جداکننده‌ها
+  List<dynamic> _displayItems = [];       // شامل پیام‌ها + جداکننده‌ها
   List<Map<String, dynamic>> _messages = [];
   String? _currentConvId;
   String _modelId = 'text';
@@ -119,24 +88,23 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   String? _convTitle;
   Map<String, dynamic>? _weatherData;
 
-  // اسکرول هوشمند
   bool _showScrollDown = false;
 
-  // زبان (fa / en)
+  // زبان (fa/en)
   String _language = 'fa';
 
-  // انیمیشن اپ‌بار immersive
+  // Immersive AppBar
   late AnimationController _appBarAnimCtrl;
   late Animation<Offset> _appBarSlide;
   bool _showImmersiveAppBar = false;
 
-  // واکنش‌های سریع (Quick Reactions)
+  // واکنش‌های سریع
   final List<String> _reactions = ['👍', '👎', '❤️', '🔥', '😮', '💡'];
 
   @override
   void initState() {
     super.initState();
-    _appBarAnimCtrl = AnimationController(vs: this, duration: 300.ms);
+    _appBarAnimCtrl = AnimationController(vsync: this, duration: 300.ms);
     _appBarSlide = Tween<Offset>(begin: Offset(0, -1), end: Offset.zero)
         .animate(CurvedAnimation(parent: _appBarAnimCtrl, curve: Curves.easeInOut));
 
@@ -162,7 +130,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // ─── هندلر اسکرول (نمایش دکمه پایین) ──────────────
+  // ─── اسکرول ───────────────────────────────────────
   void _scrollListener() {
     if (!_scrollController.hasClients) return;
     final maxScroll = _scrollController.position.maxScrollExtent;
@@ -180,7 +148,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ─── آب و هوا (انیمیشن پس‌زمینه) ──────────────────
+  // ─── آب و هوا ──────────────────────────────────────
   Future<void> _fetchWeather() async {
     final prefs = await SharedPreferences.getInstance();
     final useDynamic = prefs.getBool('use_dynamic_background') ?? false;
@@ -189,7 +157,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (mounted) setState(() => _weatherData = data);
   }
 
-  // ─── ساخت لیست نمایشی (تزریق جداکننده تاریخ) ──────
+  // ─── ساخت لیست نمایشی (تاریخ‌ها) ──────────────────
   void _buildDisplayItems() {
     _displayItems.clear();
     if (_messages.isEmpty) return;
@@ -282,7 +250,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
-  // ─── ارسال پیام (با پشتیبانی دو زبانه) ────────────
+  // ─── ارسال پیام (دو زبانه) ────────────────────────
   Future<void> _sendMessage() async {
     if (_msgController.text.trim().isEmpty || _currentConvId == null || _isSending) return;
 
@@ -296,7 +264,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       _buildDisplayItems();
     });
 
-    HapticFeedback.mediumImpact();   // شماره ۱ – بازخورد لمسی ارسال
+    HapticFeedback.mediumImpact();
     _scrollToBottom();
 
     try {
@@ -304,12 +272,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         'conversation_id': _currentConvId,
         'message': message,
         'model_id': _modelId,
-        'language': _language,       // ارسال زبان انتخاب‌شده به سرور
+        'language': _language,
       });
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        HapticFeedback.lightImpact(); // بازخورد دریافت پاسخ
+        HapticFeedback.lightImpact();
 
         setState(() {
           _messages.add({
@@ -345,7 +313,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     setState(() => _isSending = false);
   }
 
-  // ─── شماره ۴ – Quick Reactions (ایموجی) ────────────
+  // ─── Quick Reactions ──────────────────────────────
   void _showReactionPicker(int messageIndex) {
     final msg = _messages[messageIndex];
     showModalBottomSheet(
@@ -373,7 +341,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ─── شماره ۶ – منوی طولانی روی پیام‌ها ────────────
+  // ─── منوی طولانی ─────────────────────────────────
   void _showMessageMenu(int messageIndex) {
     final msg = _messages[messageIndex];
     final isUser = msg['role'] == 'user';
@@ -421,7 +389,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 title: Text(_language == 'fa' ? 'بازسازی پاسخ' : 'Regenerate'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  // TODO: منطق بازسازی پاسخ
+                  // TODO: logic for regenerate
                 },
               ),
           ],
@@ -462,7 +430,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
-  // ─── شماره ۱۰ – Immersive هوشمند (YouTube style) ──
+  // ─── Immersive هوشمند ─────────────────────────────
   void _toggleImmersive() {
     setState(() => _isImmersive = !_isImmersive);
     if (_isImmersive) {
@@ -490,7 +458,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ─── شماره ۸ و ۹ – انتخاب‌گر مدل حرفه‌ای ─────────
+  // ─── انتخاب‌گر مدل ────────────────────────────────
   void _showModelPicker() {
     showModalBottomSheet(
       context: context,
@@ -540,7 +508,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         onTap: () {
                           setState(() => _modelId = m['id']);
                           Navigator.pop(context);
-                          HapticFeedback.lightImpact(); // بازخورد تعویض
+                          HapticFeedback.lightImpact();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -565,7 +533,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ─── تعویض زبان (دو زبانه) ────────────────────────
+  // ─── تغییر زبان (دو زبانه) ────────────────────────
   void _toggleLanguage() {
     setState(() => _language = _language == 'fa' ? 'en' : 'fa');
     HapticFeedback.selectionClick();
@@ -577,7 +545,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ─── شکل حباب بر اساس تم ──────────────────────────
+  // ─── شکل حباب بر اساس AppThemeMode ─────────────────
   BorderRadius _bubbleBorderRadius(AppThemeMode mode, {required bool isUser}) {
     switch (mode) {
       case AppThemeMode.happy:
@@ -599,12 +567,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ═══════════════════ ساختار اصلی UI ═══════════════════
+  // ═══════════════════ build ═══════════════════════
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final themeProv = context.watch<ThemeProvider>();
-    final appThemeMode = themeProv.appThemeMode;  // نیاز به ThemeProvider به‌روزشده
+    final appThemeMode = themeProv.appThemeMode;  // AppThemeMode از ThemeProvider
 
     // رشته‌های دو زبانه
     final hintText = _language == 'fa' ? 'پیام خود را بنویسید...' : 'Type your message...';
@@ -614,7 +582,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     final fullscreenLabel = _language == 'fa' ? 'تمام‌صفحه' : 'Fullscreen';
     final modelLabel = _language == 'fa' ? 'مدل' : 'Model';
 
-    // اپ‌بار immersive شناور
+    // اپ‌بار Immersive شناور
     Widget? immersiveAppBar;
     if (_isImmersive && _showImmersiveAppBar) {
       immersiveAppBar = SlideTransition(
@@ -636,7 +604,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       );
     }
 
-    // لیست چت با مارک‌داون و رنگ‌بندی مدل
+    // لیست چت
     Widget chatList = ListView.builder(
       controller: _scrollController,
       itemCount: _displayItems.length,
@@ -659,7 +627,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           );
         } else {
           bubble = GestureDetector(
-            onLongPress: () => _showMessageMenu(i),  // شماره ۶ – منوی طولانی
+            onLongPress: () => _showMessageMenu(i),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -669,7 +637,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   ),
                   margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: modelColor.withOpacity(0.15),
+                    color: (modelColor ?? Colors.grey).withOpacity(0.15),
                     borderRadius: _bubbleBorderRadius(appThemeMode, isUser: false),
                   ),
                   padding: const EdgeInsets.all(12),
@@ -694,12 +662,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           );
         }
 
-        // انیمیشن ورود پیام (شماره ۱)
         return bubble.animate().fadeIn(duration: 300.ms).slideY(begin: 0.2);
       },
     );
 
-    // دکمه اسکرول هوشمند (شماره ۱۵)
     final scrollDownButton = _showScrollDown
         ? _ScrollDownButton(onPressed: _scrollToBottom)
         : null;
@@ -756,7 +722,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       ],
     );
 
-    // پس‌زمینه با انیمیشن آب‌وهوا (شماره ۲۰)
     Widget backgroundWrapper = WeatherBackground(
       weatherData: _weatherData,
       child: bodyContent,
