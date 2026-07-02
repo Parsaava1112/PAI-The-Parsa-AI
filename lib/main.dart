@@ -29,13 +29,26 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'KAI AI',
-      themeMode: themeProvider.themeMode,
-      theme: themeProvider.lightThemeData,
-      darkTheme: themeProvider.darkThemeData,
-      home: const SplashScreen(),
+
+    // انتخاب تم بر اساس themeMode
+    final currentTheme = themeProvider.themeMode == ThemeMode.light
+        ? themeProvider.lightThemeData
+        : themeProvider.darkThemeData;
+
+    // ── انیمیشن نرم برای تعویض تم (شماره ۱۷ درخواستی) ──
+    return AnimatedTheme(
+      data: currentTheme,
+      duration: const Duration(milliseconds: 800),   // مدت زمان انیمیشن
+      curve: Curves.easeInOut,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'KAI AI',
+        // ⚠️ برای پشتیبانی از ThemeMode.system (حالت خودکار) این دو خط را نگه میداریم
+        theme: themeProvider.lightThemeData,
+        darkTheme: themeProvider.darkThemeData,
+        themeMode: themeProvider.themeMode,   // به ThemeProvider واگذار شده
+        home: const SplashScreen(),
+      ),
     );
   }
 }
