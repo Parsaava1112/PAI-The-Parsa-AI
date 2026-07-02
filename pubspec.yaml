@@ -1,7 +1,7 @@
 name: pai
 description: Parsa AI App
 publish_to: 'none'
-version: 1.1.0
+version: 2.0.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -31,7 +31,7 @@ dependencies:
   share_plus: ^7.2.1               # اشتراک‌گذاری (دکمه Share در منوی پیام)
 
   # ===== بسته‌های مورد نیاز صفحه تنظیمات جدید =====
-  ambient_light: ^1.0.2            # دریافت نور محیط برای تم هوشمند
+  ambient_light: ^0.1.4            # دریافت نور محیط برای تم هوشمند
   palette_generator: ^0.3.3+1     # استخراج پالت رنگ از عکس (تم جادویی)
   image_picker: ^1.0.7            # انتخاب عکس از گالری
 
