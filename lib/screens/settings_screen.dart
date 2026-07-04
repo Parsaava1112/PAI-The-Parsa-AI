@@ -646,8 +646,8 @@ class _ChatPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
           colors: isDark
-              ? [Colors.grey[850] ?? Colors.grey, Colors.grey[900] ?? Colors.grey]
-              : [Colors.grey[100] ?? Colors.grey[100], Colors.white],
+              ? [Colors.grey.shade850 ?? Colors.grey, Colors.grey.shade900 ?? Colors.grey]
+              : [Colors.grey.shade100, Colors.white],
         ),
       ),
       padding: const EdgeInsets.all(12),
