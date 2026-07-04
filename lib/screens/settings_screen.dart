@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui'; // اضافه کردن برای اطمینان (هر چند با material در دسترس است)
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
@@ -80,7 +80,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() {
           _aiModels = models;
-          // اگر هیچ مدلی نبود، مقدار پیش‌فرض را null بگذار
           _selectedModelId = models.isNotEmpty ? models.first['id'] : null;
           _modelsLoading = false;
         });
@@ -88,7 +87,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _modelsLoading = false);
-        // در صورت تمایل می‌توانید خطا را نمایش دهید
         debugPrint('Error fetching AI models: $e');
       }
     }
@@ -211,7 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // پیش‌نمایش چت
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -222,7 +220,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           fontSize: _chatFontSize,
                           fontFamily: _chatFontFamily,
                           lineHeight: _chatLineHeight,
-                          bubbleColor: Theme.of(context).colorScheme.primary,
                           isDark: Theme.of(context).brightness == Brightness.dark,
                         ),
                       ],
@@ -231,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // انتخاب تم
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -256,7 +253,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // رنگ اکسنت
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -290,7 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // پس‌زمینه چت
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -340,7 +337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // مدل هوش مصنوعی
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -392,7 +389,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // تایپوگرافی
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -451,7 +448,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // سایر تنظیمات
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       children: [
                         SwitchListTile(
@@ -484,7 +481,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 24),
 
                   // حساب کاربری و خروج
-                  _buildGlassCard(
+                  _buildCard(
                     child: Column(
                       children: [
                         ListTile(
@@ -505,25 +502,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildGlassCard({required Widget child}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // ✅ اصلاح: ImageFilter به‌جای ColorFilter
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white24),
-            boxShadow: [
-              BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 4)),
-            ],
-          ),
-          child: child,
-        ),
+  /// کارت ساده و خوانا (بدون BackdropFilter مشکل‌ساز)
+  Widget _buildCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withOpacity(0.95), // opacity بالا برای جلوگیری از شفافیت بیش از حد
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
+      child: child,
     );
   }
 
@@ -636,7 +628,6 @@ class _ChatPreview extends StatelessWidget {
   final double fontSize;
   final String fontFamily;
   final double lineHeight;
-  final Color bubbleColor;
   final bool isDark;
 
   const _ChatPreview({
@@ -644,7 +635,6 @@ class _ChatPreview extends StatelessWidget {
     required this.fontSize,
     required this.fontFamily,
     required this.lineHeight,
-    required this.bubbleColor,
     required this.isDark,
   });
 
@@ -656,8 +646,8 @@ class _ChatPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
           colors: isDark
-              ? [Colors.grey[850] ?? Colors.grey, Colors.grey[900] ?? Colors.grey] // ✅ رفع null assertion
-              : [Colors.grey[100]!, Colors.white],
+              ? [Colors.grey[850] ?? Colors.grey, Colors.grey[900] ?? Colors.grey]
+              : [Colors.grey[100] ?? Colors.grey[100], Colors.white],
         ),
       ),
       padding: const EdgeInsets.all(12),
@@ -736,7 +726,6 @@ class _BgCarouselItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String? bgPath = path;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -744,8 +733,8 @@ class _BgCarouselItem extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: bgPath == null ? Colors.grey[300] : null,
-          image: bgPath != null ? DecorationImage(image: AssetImage(bgPath), fit: BoxFit.cover) : null,
+          color: path == null ? Colors.grey[300] : null,
+          image: path != null ? DecorationImage(image: AssetImage(path!), fit: BoxFit.cover) : null,
           border: Border.all(
             color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade400,
             width: isSelected ? 3 : 1,
@@ -754,7 +743,7 @@ class _BgCarouselItem extends StatelessWidget {
               ? [BoxShadow(color: Theme.of(context).primaryColor.withOpacity(0.4), blurRadius: 8)]
               : [],
         ),
-        child: bgPath == null
+        child: path == null
             ? const Center(child: Text('بدون\nتصویر', textAlign: TextAlign.center, style: TextStyle(fontSize: 12)))
             : null,
       ),
