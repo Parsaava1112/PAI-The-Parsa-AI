@@ -502,13 +502,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// کارت ساده و خوانا (بدون BackdropFilter مشکل‌ساز)
   Widget _buildCard({required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor.withOpacity(0.95), // opacity بالا برای جلوگیری از شفافیت بیش از حد
+        color: Theme.of(context).cardColor.withOpacity(0.95),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.withOpacity(0.2)),
         boxShadow: [
@@ -622,7 +621,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// پیش‌نمایش چت
+// پیش‌نمایش چت (اصلاح‌شده)
 class _ChatPreview extends StatelessWidget {
   final Color accentColor;
   final double fontSize;
@@ -646,7 +645,7 @@ class _ChatPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
           colors: isDark
-              ? [Colors.grey.shade850 ?? Colors.grey, Colors.grey.shade900 ?? Colors.grey]
+              ? [Colors.grey.shade800, Colors.grey.shade900]   // اصلاح‌شده: shade800 و shade900 معتبرند
               : [Colors.grey.shade100, Colors.white],
         ),
       ),
