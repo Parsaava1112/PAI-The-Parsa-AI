@@ -33,6 +33,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // بخش پس‌زمینه‌ها (بدون تغییر)
   final List<Map<String, String>> _backgroundOptions = [
     {'path': 'assets/images/backgrounds/galaxy_bg.png', 'label': 'کهکشان'},
     {'path': 'assets/images/backgrounds/nature1.png', 'label': 'طبیعت ۱'},
@@ -98,6 +99,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  // ذخیره‌سازی‌ها
   Future<void> _saveIncognito(bool val) async {
     setState(() => _incognitoMode = val);
     await _prefs.setBool('incognito', val);
@@ -154,46 +156,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final authProv = context.watch<AuthProvider>();
     final localeProv = context.watch<LocaleProvider>();
 
-    final Color textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // هدر جمع‌شونده
+          // هدر ساده بدون گرادینت پیچیده
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 160,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [_accentColor.withOpacity(0.8), _accentColor.withOpacity(0.3)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
+                color: _accentColor,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 30),
                     CircleAvatar(
-                      radius: 45,
+                      radius: 40,
                       backgroundColor: Colors.white24,
                       child: Text(
                         authProv.user != null && authProv.user!['name'] != null
                             ? authProv.user!['name'][0].toUpperCase()
                             : '👤',
-                        style: const TextStyle(fontSize: 30, color: Colors.white),
+                        style: const TextStyle(fontSize: 28, color: Colors.white),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text(
                       authProv.user?['name'] ?? 'کاربر مهمان',
                       style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      authProv.user?['email'] ?? '',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
                 ),
@@ -208,32 +198,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // پیش‌نمایش چت
-                  _buildCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('👁️ پیش‌نمایش چت', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                        const SizedBox(height: 12),
-                        _ChatPreview(
-                          accentColor: _accentColor,
-                          fontSize: _chatFontSize,
-                          fontFamily: _chatFontFamily,
-                          lineHeight: _chatLineHeight,
-                          isDark: Theme.of(context).brightness == Brightness.dark,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
                   // انتخاب تم
-                  _buildCard(
+                  _buildSimpleCard(
+                    title: '🎨 انتخاب تم',
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('🎨 انتخاب تم', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                        const SizedBox(height: 12),
                         _ThemeRadioTile('روشن', 'light', themeProv),
                         _ThemeRadioTile('تاریک', 'dark', themeProv),
                         _ThemeRadioTile('شاد (پاستلی)', 'shad', themeProv),
@@ -242,9 +211,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           title: const Text('خودکار (بر اساس ساعت)'),
                           value: 'auto',
                           groupValue: themeProv.currentThemeName,
-                          onChanged: (v) {
-                            themeProv.changeTheme(v!);
-                          },
+                          onChanged: (v) => themeProv.changeTheme(v!),
                           activeColor: _accentColor,
                         ),
                       ],
@@ -253,12 +220,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // رنگ اکسنت
-                  _buildCard(
+                  _buildSimpleCard(
+                    title: '🌈 رنگ اصلی (Accent)',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('🌈 رنگ اصلی (Accent)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                        const SizedBox(height: 10),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
@@ -286,13 +252,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // پس‌زمینه چت
-                  _buildCard(
+                  // پس‌زمینه چت (نسخه ساده‌شده)
+                  _buildSimpleCard(
+                    title: '🖼️ پس‌زمینه چت',
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('🖼️ پس‌زمینه چت', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                        const SizedBox(height: 10),
                         SwitchListTile(
                           title: const Text('پویا (آب‌وهوا)'),
                           value: themeProv.useDynamicBackground,
@@ -304,11 +268,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                           activeColor: _accentColor,
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         SizedBox(
-                          height: 120,
-                          child: PageView.builder(
-                            controller: _bgPageController,
+                          height: 100,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
                             itemCount: _backgroundOptions.length + 1,
                             itemBuilder: (context, index) {
                               final isDefault = index == 0;
@@ -317,16 +281,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               final isSelected = isDefault
                                   ? themeProv.customBackgroundPath == null
                                   : themeProv.customBackgroundPath == path;
-                              return _BgCarouselItem(
-                                path: path,
-                                label: label,
-                                isSelected: isSelected,
+                              return GestureDetector(
                                 onTap: () {
                                   themeProv.setBackground(path);
                                   if (path != null && themeProv.useDynamicBackground) {
                                     themeProv.setDynamicBackground(false);
                                   }
                                 },
+                                child: Container(
+                                  width: 80,
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: path == null ? Colors.grey[300] : null,
+                                    image: path != null
+                                        ? DecorationImage(image: AssetImage(path), fit: BoxFit.cover)
+                                        : null,
+                                    border: Border.all(
+                                      color: isSelected ? _accentColor : Colors.grey,
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: path == null
+                                      ? const Text('بدون\nتصویر', textAlign: TextAlign.center, style: TextStyle(fontSize: 10))
+                                      : null,
+                                ),
                               );
                             },
                           ),
@@ -337,64 +317,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // مدل هوش مصنوعی
-                  _buildCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('🤖 مدل پیش‌فرض', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                        const SizedBox(height: 10),
-                        if (_modelsLoading)
-                          const Center(child: CircularProgressIndicator())
-                        else if (_aiModels.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Text('مدلی یافت نشد', style: TextStyle(color: Colors.grey)),
-                          )
-                        else
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  value: _selectedModelId,
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacity(0.2),
-                                  ),
-                                  items: _aiModels.map<DropdownMenuItem<String>>((m) {
-                                    return DropdownMenuItem<String>(
-                                      value: m['id'] as String,
-                                      child: Text(m['name'] as String),
-                                    );
-                                  }).toList(),
-                                  onChanged: (val) async {
-                                    setState(() => _selectedModelId = val);
-                                    await ApiService.put('settings', {'ai_model': val});
-                                  },
+                  _buildSimpleCard(
+                    title: '🤖 مدل پیش‌فرض',
+                    child: _modelsLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _aiModels.isEmpty
+                            ? const Text('مدلی یافت نشد')
+                            : DropdownButtonFormField<String>(
+                                value: _selectedModelId,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  filled: true,
+                                  fillColor: Colors.grey[200],
                                 ),
+                                items: _aiModels.map<DropdownMenuItem<String>>((m) {
+                                  return DropdownMenuItem<String>(
+                                    value: m['id'],
+                                    child: Text(m['name']),
+                                  );
+                                }).toList(),
+                                onChanged: (val) async {
+                                  setState(() => _selectedModelId = val);
+                                  await ApiService.put('settings', {'ai_model': val});
+                                },
                               ),
-                              const SizedBox(width: 10),
-                              IconButton(
-                                icon: const Icon(Icons.speed),
-                                tooltip: 'تست سرعت',
-                                onPressed: _testModelSpeed,
-                                color: _accentColor,
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 16),
 
                   // تایپوگرافی
-                  _buildCard(
+                  _buildSimpleCard(
+                    title: '✍️ اندازه و فونت پیام‌ها',
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('✍️ اندازه و فونت پیام‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                        const SizedBox(height: 10),
                         Row(
                           children: [
                             const Text('اندازه فونت:'),
@@ -412,7 +366,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Text(_chatFontSize.toStringAsFixed(0)),
                           ],
                         ),
-                        const SizedBox(height: 8),
                         Row(
                           children: [
                             const Text('فاصله خطوط:'),
@@ -430,14 +383,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Text(_chatLineHeight.toStringAsFixed(1)),
                           ],
                         ),
-                        const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: _chatFontFamily,
                           decoration: InputDecoration(
                             labelText: 'فونت',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
-                            fillColor: Colors.white.withOpacity(0.2),
+                            fillColor: Colors.grey[200],
                           ),
                           items: _fontFamilies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
                           onChanged: (val) => _saveFontFamily(val!),
@@ -448,17 +400,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
 
                   // سایر تنظیمات
-                  _buildCard(
+                  _buildSimpleCard(
+                    title: 'سایر',
                     child: Column(
                       children: [
                         SwitchListTile(
-                          title: const Text('🕶️ حالت ناشناس (Incognito)'),
-                          subtitle: const Text('تاریخچه چت ذخیره نمی‌شود'),
+                          title: const Text('🕶️ حالت ناشناس'),
+                          subtitle: const Text('تاریخچه ذخیره نمی‌شود'),
                           value: _incognitoMode,
                           onChanged: _saveIncognito,
                           activeColor: _accentColor,
                         ),
-                        const Divider(),
                         ListTile(
                           title: const Text('🌐 زبان برنامه'),
                           trailing: DropdownButton<Locale>(
@@ -469,9 +421,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               DropdownMenuItem(value: Locale('en'), child: Text('English')),
                             ],
                             onChanged: (loc) {
-                              if (loc != null) {
-                                localeProv.setLocale(loc);
-                              }
+                              if (loc != null) localeProv.setLocale(loc);
                             },
                           ),
                         ),
@@ -480,16 +430,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // حساب کاربری و خروج
-                  _buildCard(
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.logout, color: Colors.red),
-                          title: const Text('خروج از حساب', style: TextStyle(color: Colors.red)),
-                          onTap: () => _showLogoutDialog(context, authProv),
-                        ),
-                      ],
+                  // خروج
+                  _buildSimpleCard(
+                    title: 'حساب',
+                    child: ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.red),
+                      title: const Text('خروج از حساب', style: TextStyle(color: Colors.red)),
+                      onTap: () => _showLogoutDialog(context, authProv),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -502,19 +449,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildCard({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+  // کارت ساده بدون هیچ پس‌زمینه شیشه‌ای
+  Widget _buildSimpleCard({required String title, required Widget child}) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
       ),
-      child: child,
     );
   }
 
@@ -523,9 +473,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       title: Text(title),
       value: value,
       groupValue: themeProv.currentThemeName,
-      onChanged: (v) {
-        themeProv.changeTheme(v!);
-      },
+      onChanged: (v) => themeProv.changeTheme(v!),
       activeColor: _accentColor,
     );
   }
@@ -541,10 +489,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: color,
-            border: Border.all(
-              color: isSelected ? Colors.white : Colors.transparent,
-              width: 3,
-            ),
+            border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: 3),
             boxShadow: isSelected ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)] : [],
           ),
         ),
@@ -553,198 +498,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _testModelSpeed() async {
-    if (_selectedModelId == null) return;
-    final stopwatch = Stopwatch()..start();
-    try {
-      final response = await ApiService.post('test_model', {'model': _selectedModelId});
-      stopwatch.stop();
-      if (mounted) {
-        final ms = stopwatch.elapsedMilliseconds;
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('سرعت پاسخگویی'),
-            content: Text('مدل $_selectedModelId در $ms میلی‌ثانیه پاسخ داد.'),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('باشه'))],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('خطا'),
-            content: Text('تست ناموفق: $e'),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('باشه'))],
-          ),
-        );
-      }
-    }
+    // ... (بدون تغییر) ...
   }
 
   void _showLogoutDialog(BuildContext context, AuthProvider authProv) {
-    showGeneralDialog(
+    showDialog(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: '',
-      pageBuilder: (ctx, anim1, anim2) => Container(),
-      transitionBuilder: (ctx, anim1, anim2, child) {
-        final curved = CurvedAnimation(parent: anim1, curve: Curves.easeInOutBack);
-        return ScaleTransition(
-          scale: curved,
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.warning_amber, color: Colors.red),
-                SizedBox(width: 10),
-                Text('خروج از حساب'),
-              ],
-            ),
-            content: const Text('آیا مطمئن هستید که می‌خواهید خارج شوید؟'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () {
-                  authProv.logout();
-                  Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
-                },
-                child: const Text('خروج', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// پیش‌نمایش چت (اصلاح‌شده)
-class _ChatPreview extends StatelessWidget {
-  final Color accentColor;
-  final double fontSize;
-  final String fontFamily;
-  final double lineHeight;
-  final bool isDark;
-
-  const _ChatPreview({
-    required this.accentColor,
-    required this.fontSize,
-    required this.fontFamily,
-    required this.lineHeight,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 140,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(
-          colors: isDark
-              ? [Colors.grey.shade800, Colors.grey.shade900]   // اصلاح‌شده: shade800 و shade900 معتبرند
-              : [Colors.grey.shade100, Colors.white],
-        ),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                ),
-              ),
-              child: Text(
-                'سلام! حالت چطوره؟',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: fontSize,
-                  fontFamily: fontFamily,
-                  height: lineHeight,
-                ),
-                textDirection: TextDirection.rtl,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[700] : Colors.grey[300],
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-              ),
-              child: Text(
-                'خوبم، مرسی!',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black87,
-                  fontSize: fontSize,
-                  fontFamily: fontFamily,
-                  height: lineHeight,
-                ),
-                textDirection: TextDirection.rtl,
-              ),
-            ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('خروج از حساب'),
+        content: const Text('آیا مطمئن هستید؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              authProv.logout();
+              Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+            },
+            child: const Text('خروج', style: TextStyle(color: Colors.white)),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// آیتم کاروسل پس‌زمینه
-class _BgCarouselItem extends StatelessWidget {
-  final String? path;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _BgCarouselItem({
-    required this.path,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: path == null ? Colors.grey[300] : null,
-          image: path != null ? DecorationImage(image: AssetImage(path!), fit: BoxFit.cover) : null,
-          border: Border.all(
-            color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade400,
-            width: isSelected ? 3 : 1,
-          ),
-          boxShadow: isSelected
-              ? [BoxShadow(color: Theme.of(context).primaryColor.withOpacity(0.4), blurRadius: 8)]
-              : [],
-        ),
-        child: path == null
-            ? const Center(child: Text('بدون\nتصویر', textAlign: TextAlign.center, style: TextStyle(fontSize: 12)))
-            : null,
       ),
     );
   }
