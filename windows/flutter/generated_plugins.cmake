@@ -3,8 +3,11 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  ambient_light
+  file_selector_windows
   flutter_tts
   geolocator_windows
+  share_plus
   url_launcher_windows
 )
 

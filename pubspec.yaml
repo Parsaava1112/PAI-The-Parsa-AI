@@ -35,6 +35,8 @@ dependencies:
   palette_generator: ^0.3.3+1     # استخراج پالت رنگ از عکس (تم جادویی)
   image_picker: ^1.0.7            # انتخاب عکس از گالری
 
+  package_info_plus: ^8.0.0  # آخرین نسخه
+
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 

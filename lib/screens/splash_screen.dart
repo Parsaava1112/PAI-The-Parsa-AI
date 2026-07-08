@@ -54,29 +54,33 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkUpdateThenNavigate() async {
+    // checkForUpdate فقط در صورت وجود نسخه جدیدتر داده برمی‌گرداند
     final updateData = await UpdateService.checkForUpdate();
-    if (updateData != null && await UpdateService.isUpdateAvailable(updateData)) {
-      if (mounted) {
-        final result = await _showUpdateDialog(updateData);
-        if (result == true) {
-          final url = Platform.isAndroid
-              ? updateData['download_url_android']
-              : updateData['download_url_windows'];
-          if (url != null && url.isNotEmpty) {
-            await launchUrl(Uri.parse(url));
-          }
-          if (updateData['force_update'] == true) {
-            SystemNavigator.pop();
-            return;
-          }
+
+    if (updateData != null && mounted) {
+      final result = await _showUpdateDialog(updateData);
+      if (result == true) {
+        final url = Platform.isAndroid
+            ? updateData['download_url_android']
+            : updateData['download_url_windows'];
+        if (url != null && url.isNotEmpty) {
+          await launchUrl(Uri.parse(url));
         }
       }
+      if (updateData['force_update'] == true) {
+        // خروج از برنامه برای آپدیت اجباری
+        SystemNavigator.pop();
+        return;
+      }
     }
+
     if (mounted) {
       final auth = context.read<AuthProvider>();
       Navigator.pushReplacement(
         context,
-        CustomPageRoute(page: auth.isLoggedIn ? const ChatScreen() : const WelcomeScreen()),
+        CustomPageRoute(
+          page: auth.isLoggedIn ? const ChatScreen() : const WelcomeScreen(),
+        ),
       );
     }
   }
@@ -134,7 +138,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // ربات سه‌بعدی Lottie
                     SizedBox(
                       width: 180,
                       height: 180,
@@ -142,8 +145,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ).animate().scale(duration: 1.seconds).fadeIn(),
                     const SizedBox(height: 20),
                     Text('KAI AI',
-                            style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'Vazir'))
-                        .animate().fadeIn(delay: 0.5.seconds),
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Vazir',
+                            ))
+                        .animate()
+                        .fadeIn(delay: 0.5.seconds),
                   ],
                 ),
               ),

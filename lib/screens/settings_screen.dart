@@ -506,26 +506,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildGlassCard({required Widget child}) {
-    return ClipRRect(
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Theme.of(context).cardColor.withOpacity(0.6), // میزان کدری
       borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // ✅ اصلاح: ImageFilter به‌جای ColorFilter
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white24),
-            boxShadow: [
-              BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 4)),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
+      border: Border.all(color: Colors.white24),
+      boxShadow: [
+        BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 4)),
+      ],
+    ),
+    child: child,
+  );
+}
 
   Widget _ThemeRadioTile(String title, String value, ThemeProvider themeProv) {
     return RadioListTile<String>(
