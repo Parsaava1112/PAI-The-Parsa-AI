@@ -1,3 +1,4 @@
+import 'dart:convert'; // برای jsonDecode
 import 'package:package_info_plus/package_info_plus.dart';
 import 'api_service.dart';
 
@@ -8,7 +9,7 @@ class UpdateService {
     try {
       final response = await ApiService.get('version');
       if (response.statusCode == 200) {
-        final data = response.data as Map<String, dynamic>;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
         final remoteVersion = data['version'] as String;
 
         final packageInfo = await PackageInfo.fromPlatform();
