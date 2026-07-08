@@ -152,6 +152,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             ))
                         .animate()
                         .fadeIn(delay: 0.5.seconds),
+                    Text('Parsa AI',
+                            style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'Vazir'))
+                        .animate().fadeIn(delay: 0.5.seconds),
                   ],
                 ),
               ),

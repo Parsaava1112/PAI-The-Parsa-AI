@@ -1,7 +1,11 @@
 name: pai
 description: Parsa AI App
 publish_to: 'none'
+<<<<<<< HEAD
 version: 2.1.2
+=======
+version: 2.0.0
+>>>>>>> 3758aafd0b342a356e2c3f96233174ed5f72c2d3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -37,6 +41,8 @@ dependencies:
 
   package_info_plus: ^8.0.0  # آخرین نسخه
 
+=======
+>>>>>>> 3758aafd0b342a356e2c3f96233174ed5f72c2d3
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
